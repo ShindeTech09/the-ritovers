@@ -1,6 +1,7 @@
-import { getAuth } from "@hono/clerk-auth";
+import { getAuth, ClerkAuthVariables } from "@hono/clerk-auth";
 import { createMiddleware } from "hono/factory";
 import type { CustomJwtSessionClaims } from "@repo/types";
+import { use } from "hono/jsx";
 
 export const shouldBeUser = createMiddleware<{ Variables: { userId: string } }>(
   async (c, next) => {
@@ -21,8 +22,9 @@ export const shouldBeAdmin = createMiddleware<{
   Variables: { userId: string };
 }>(async (c, next) => {
   const auth = getAuth(c);
+  const userId = auth?.userId;
 
-  if (!auth?.userId) {
+  if (!userId) {
     return c.json(
       {
         message: "You are not logged in",
@@ -31,9 +33,13 @@ export const shouldBeAdmin = createMiddleware<{
     );
   }
 
-  const claims = auth.sessionClaims as CustomJwtSessionClaims;
+  const clerkAuth: ClerkAuthVariables = {} as ClerkAuthVariables;
 
-  if (claims.role !== "admin") {
+  const user = (await clerkAuth.clerk.users.getUser(
+    userId
+  )) as CustomJwtSessionClaims;
+
+  if (user.publicMetadata.role !== "admin") {
     return c.json({ message: "User is not an admin" }, 403);
   }
 
